@@ -36,7 +36,7 @@ func main() {
 
 	pkgs, _ := dirPackageInfo("./", *fromFlag, *toFlag)
 	for _, pi := range pkgs {
-		err := refactImports(pi.fset, pi.f, pi.paths, pi.filename, *debug)
+		err := refactImports(pi.fset, pi.f, pi.paths, pi.filePath, *debug)
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
@@ -45,7 +45,7 @@ func main() {
 }
 
 type packageInfo struct {
-	filename string
+	filePath string
 	f        *ast.File
 	fset     *token.FileSet
 	paths    []*pathInfo
@@ -57,9 +57,9 @@ type pathInfo struct {
 
 // refactImports fixes imports to new.
 func refactImports(
-	fset *token.FileSet, f *ast.File, paths []*pathInfo, filename string, debug bool,
+	fset *token.FileSet, f *ast.File, paths []*pathInfo, filePath string, debug bool,
 ) error {
-	abs, err := filepath.Abs(filename)
+	abs, err := filepath.Abs(filePath)
 	if err != nil {
 		return err
 	}
@@ -81,9 +81,9 @@ func refactImports(
 		if changed {
 			var buf bytes.Buffer
 			if err := format.Node(&buf, fset, f); err != nil {
-				return fmt.Errorf("%s: couldn't format file: %v", filename, err)
+				return fmt.Errorf("%s: couldn't format file: %v", filePath, err)
 			}
-			ioutil.WriteFile(filename, buf.Bytes(), 0755)
+			ioutil.WriteFile(filePath, buf.Bytes(), 0755)
 		}
 
 	}
@@ -94,19 +94,22 @@ func refactImports(
 func dirPackageInfo(srcDir string, from string, to string) ([]*packageInfo, error) {
 	re, _ := regexp.Compile(from)
 
-	packageFileInfos, err := ioutil.ReadDir(srcDir)
+	var fileList []string
+	err := filepath.Walk(srcDir, func(path string, f os.FileInfo, err error) error {
+		ignore := strings.HasPrefix(path, "vendor/") || strings.HasPrefix(path, ".git/")
+		if !ignore && strings.HasSuffix(f.Name(), ".go") {
+			fileList = append(fileList, path)
+		}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	var result []*packageInfo
-	for _, fi := range packageFileInfos {
-		if !strings.HasSuffix(fi.Name(), ".go") {
-			continue
-		}
-
+	for _, filePath := range fileList {
 		fileSet := token.NewFileSet()
-		root, err := parser.ParseFile(fileSet, filepath.Join(srcDir, fi.Name()), nil, 0)
+		root, err := parser.ParseFile(fileSet, filepath.Join(srcDir, filePath), nil, 0)
 		if err != nil {
 			continue
 		}
@@ -128,7 +131,7 @@ func dirPackageInfo(srcDir string, from string, to string) ([]*packageInfo, erro
 				}
 			}
 		}
-		result = append(result, &packageInfo{filename: fi.Name(), fset: fileSet, f: root, paths: paths})
+		result = append(result, &packageInfo{filePath: filePath, fset: fileSet, f: root, paths: paths})
 	}
 	return result, nil
 }
