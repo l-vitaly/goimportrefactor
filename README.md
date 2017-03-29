@@ -4,7 +4,7 @@ Tool can refactoring imports
 # Install 
 
 ``` golang
-$ go get github.com/l-vitaly/goimportrefactor/...
+$ go get -u github.com/l-vitaly/goimportrefactor/...
 ```
 
 # Usage
