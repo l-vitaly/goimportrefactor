@@ -14,6 +14,8 @@ import (
 	"regexp"
 	"strings"
 
+	"os"
+
 	"golang.org/x/tools/go/ast/astutil"
 )
 
@@ -28,9 +30,18 @@ func init() {
 }
 
 func main() {
+	if *fromFlag == "" || *toFlag == "" {
+		log.Println("-from and -to flag required")
+		os.Exit(1)
+	}
+
 	pkgs, _ := dirPackageInfo("./", *fromFlag, *toFlag)
 	for _, pi := range pkgs {
-		refactImports(pi.fset, pi.f, pi.paths, pi.filename, *debug)
+		err := refactImports(pi.fset, pi.f, pi.paths, pi.filename, *debug)
+		if err != nil {
+			log.Println(err)
+			os.Exit(1)
+		}
 	}
 }
 
